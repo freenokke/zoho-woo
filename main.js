@@ -39,43 +39,48 @@ app.all('/auth/redirect', async (req, res) => {
 })
 
 app.post('/inventory/created', async (req, res) => {
-  console.log(req.body)
-  const { image_name, sku, image_type, unit, item_id, name, description, rate, package_details, available_stock } = req.body.item;
-  const { weight_unit, length, width, weight, dimension_unit, height } = package_details;
   try {
-    const bl = await getZohoItemIMG(item_id)
-    const fd = new FormData();
-    fd.append("file", bl, image_name);
-    const retrieveMediaURL = await sendIMGtoWPMedia(fd)
-    const { id, source_url } = retrieveMediaURL.data
-    const response = await Woo.post('products', {
-      name,
-      status: 'draft',
-      regular_price: rate.toString(),
-      sku,
-      description,
-      weight: weight.toString(),
-      dimensions: {
-        length: length.toString(),
-        width: width.toString(),
-        height: height.toString()
-      },
-      images: [
-        {
-          id,
-          src: source_url,
+    if (req.body.item) {
+      const { image_name, sku, image_type, unit, item_id, name, description, rate, package_details, available_stock } = req.body.item;
+      const { weight_unit, length, width, weight, dimension_unit, height } = package_details;
+      const bl = await getZohoItemIMG(item_id)
+      const data = {
+        name,
+        status: 'draft',
+        regular_price: rate.toString(),
+        sku,
+        description,
+        weight: weight.toString(),
+        dimensions: {
+          length: length.toString(),
+          width: width.toString(),
+          height: height.toString()
         }
-      ]
-    });
-
-    await updateZohoItemById(item_id, {
-      custom_fields: [
-        {
-          api_name: "cf_woocommerce",
-          value: response.data.id
-        }
-      ]
-    })
+      }
+      if (bl.type.includes('image')) {
+        console.log('wpmedia')
+        const fd = new FormData();
+        fd.append("file", bl, image_name);
+        const retrieveMediaURL = await sendIMGtoWPMedia(fd)
+        const { id, source_url } = retrieveMediaURL.data
+        data.images = [
+          {
+            id,
+            src: source_url,
+          }
+        ]
+      }
+      const response = await Woo.post('products', data);
+  
+      await updateZohoItemById(item_id, {
+        custom_fields: [
+          {
+            api_name: "cf_woocommerce",
+            value: response.data.id
+          }
+        ]
+      })
+    }
     res.sendStatus(200);
   } catch (error) {
     console.log(error)
@@ -84,35 +89,41 @@ app.post('/inventory/created', async (req, res) => {
 
 app.post('/inventory/updated', async (req, res) => {
   console.log(req.body)
-  const { image_name, sku, image_type, unit, item_id, name, description, rate, package_details, available_stock, custom_field_hash } = req.body.item;
-  const { weight_unit, length, width, weight, dimension_unit, height } = package_details;
-  const { cf_woocommerce } = custom_field_hash;
   try {
-    const bl = await getZohoItemIMG(item_id)
-    console.log(bl)
-    console.log(image_name)
-    const fd = new FormData();
-    fd.append("file", bl, image_name);
-    const retrieveMediaURL = await sendIMGtoWPMedia(fd)
-    const { id, source_url } = retrieveMediaURL.data
-    await Woo.put(`products/${cf_woocommerce}`, {
-      name,
-      regular_price: rate.toString(),
-      sku,
-      description,
-      weight: weight.toString(),
-      dimensions: {
-        length: length.toString(),
-        width: width.toString(),
-        height: height.toString()
-      },
-      images: [
-        {
-          id,
-          src: source_url,
+    if (req.body.item) {
+      const { image_name, sku, image_type, unit, item_id, name, description, rate, package_details, available_stock, custom_field_hash } = req.body.item;
+      const { weight_unit, length, width, weight, dimension_unit, height } = package_details;
+      const { cf_woocommerce } = custom_field_hash;
+      const bl = await getZohoItemIMG(item_id)
+      console.log(bl)
+      console.log(image_name)
+      const data = {
+        name,
+        regular_price: rate.toString(),
+        sku,
+        description,
+        weight: weight.toString(),
+        dimensions: {
+          length: length.toString(),
+          width: width.toString(),
+          height: height.toString()
         }
-      ]
-    });
+      }
+      if (bl.type.includes('image')) {
+        const fd = new FormData();
+        fd.append("file", bl, image_name);
+        const retrieveMediaURL = await sendIMGtoWPMedia(fd)
+        const { id, source_url } = retrieveMediaURL.data
+        data.images = [
+          {
+            id,
+            src: source_url,
+          }
+        ]
+      }
+
+      await Woo.put(`products/${cf_woocommerce}`, data);
+    }
     res.sendStatus(200);
   } catch (error) {
     console.log(error)
